@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>いきもの図鑑</title>
+<style>
+  :root {
+    --bg: #f6f4ee;
+    --card: #ffffff;
+    --text: #2b2a26;
+    --muted: #7a776d;
+    --accent: #3d7a4f;
+    --accent-soft: #e3efe5;
+    --new: #c4842a;
+    --new-soft: #f8ecd8;
+    --silhouette: #e4e1d8;
+    --border: #e2ded2;
+    --danger: #b4483c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header {
+    background: var(--accent);
+    color: #fff;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  header h1 { margin: 0; font-size: 1.25rem; }
+  header .actions { display: flex; gap: 6px; }
+  header button { background: transparent; border: 1px solid #fff8; color: #fff; padding: 6px 10px; font-size: .85rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  h2 { margin: 0 0 12px; font-size: 1.05rem; }
+  h3 { margin: 18px 0 8px; font-size: .95rem; display: flex; justify-content: space-between; }
+  h3 .muted { font-weight: normal; }
+  button {
+    font: inherit;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    color: var(--text);
+  }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.danger { color: var(--danger); border-color: var(--danger); }
+  button.small { padding: 4px 10px; font-size: .85rem; }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=text], input[type=password], select {
+    font: inherit;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+  }
+  label { display: block; font-size: .9rem; color: var(--muted); margin: 8px 0 4px; }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .center { text-align: center; }
+
+  .shoot-btn {
+    display: block;
+    width: 100%;
+    padding: 28px 16px;
+    font-size: 1.1rem;
+    text-align: center;
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    cursor: pointer;
+  }
+  #preview { width: 100%; max-height: 360px; object-fit: contain; border-radius: 8px; margin-top: 12px; background: #000; }
+
+  .candidate {
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+  .candidate.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .name { font-weight: bold; font-size: 1.05rem; }
+  .sci { font-style: italic; color: var(--muted); font-size: .9rem; }
+  .badge {
+    display: inline-block;
+    font-size: .75rem;
+    padding: 1px 8px;
+    border-radius: 99px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    margin-right: 4px;
+  }
+  .badge.new { background: var(--new-soft); color: var(--new); }
+  .search-link {
+    display: inline-block;
+    font-size: .9rem;
+    padding: 4px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 99px;
+    color: var(--accent);
+    text-decoration: none;
+    background: var(--card);
+  }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 4px; }
+  .tabs button { flex: 1; }
+  .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .progress { height: 8px; background: var(--silhouette); border-radius: 99px; overflow: hidden; margin: 8px 0 4px; }
+  .progress div { height: 100%; background: var(--accent); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+  .card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--card); }
+  .card img, .card .shadow { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .card .shadow {
+    background: var(--silhouette);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; color: #fff; font-weight: bold;
+  }
+  .card .body { padding: 4px 6px; }
+  .card .num { font-size: .7rem; color: var(--muted); }
+  .card .title { font-weight: bold; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card.unfound .title { color: var(--muted); }
+  .card.new { border-color: var(--new); }
+
+  dialog { border: none; border-radius: 12px; padding: 0; max-width: 560px; width: calc(100% - 32px); max-height: calc(100% - 32px); }
+  dialog::backdrop { background: #0008; }
+  dialog .hero { width: 100%; max-height: 45vh; object-fit: contain; background: #000; display: block; }
+  dialog .body { padding: 16px; }
+  .records { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .record { display: flex; gap: 10px; align-items: center; border: 1px solid var(--border); border-radius: 8px; padding: 6px; }
+  .record img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; }
+  .record .info { flex: 1; font-size: .85rem; }
+  .maint { background: var(--new-soft); border-radius: 10px; padding: 12px; margin-top: 12px; }
+  .error { color: var(--danger); margin-top: 8px; white-space: pre-wrap; }
+  .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid #fff8; border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌿 いきもの図鑑</h1>
+  <div class="actions hidden" id="headerActions">
+    <button id="settingsBtn">⚙ 設定</button>
+    <button id="logoutBtn">ログアウト</button>
+  </div>
+</header>
+
+<main>
+  <!-- ログイン -->
+  <section id="loginView" class="hidden center">
+    <h2>家族の図鑑にログイン</h2>
+    <p class="muted">家族として登録された Google アカウントでログインしてください。</p>
+    <button class="primary" id="loginBtn">Google でログイン</button>
+    <div id="loginError" class="error"></div>
+  </section>
+
+  <!-- 読み込み中 -->
+  <section id="loadingView" class="center">
+    <p class="muted">読み込んでいます…</p>
+  </section>
+
+  <div id="appView" class="hidden">
+    <!-- 設定（APIキー） -->
+    <section id="settings" class="hidden">
+      <h2>設定</h2>
+      <p class="muted">
+        画像認識には Google の Gemini API（無料枠あり）を使います。<br>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> で取得した API キーを貼り付けてください。キーは家族の図鑑に保存され、家族はログインするだけで使えるようになります。
+      </p>
+      <label for="apiKey">API キー</label>
+      <input type="password" id="apiKey" placeholder="AIza...">
+      <label for="model">モデル名（ふつうは変えなくて大丈夫です）</label>
+      <input type="text" id="model">
+      <div class="row">
+        <button class="primary" id="saveSettings">保存</button>
+      </div>
+    </section>
+
+    <!-- 撮影 -->
+    <section>
+      <h2>📷 見つけたいきものを調べる</h2>
+      <label class="shoot-btn" for="photo">写真を撮る / 選ぶ</label>
+      <input type="file" id="photo" accept="image/*" capture="environment" class="hidden">
+      <img id="preview" class="hidden" alt="">
+      <div class="row">
+        <button class="primary hidden" id="identifyBtn">この写真を調べる</button>
+      </div>
+      <div id="error" class="error"></div>
+    </section>
+
+    <!-- 判定結果 -->
+    <section id="result" class="hidden">
+      <h2>🔍 候補</h2>
+      <p class="muted">いちばん近いものを選んで登録してください。</p>
+      <div id="candidates"></div>
+      <label for="finder">見つけた人</label>
+      <input type="text" id="finder" placeholder="なまえ">
+      <div class="row">
+        <button class="primary" id="registerBtn" disabled>登録する</button>
+      </div>
+      <div id="registerError" class="error"></div>
+    </section>
+
+    <!-- 図鑑 -->
+    <section>
+      <h2>📖 関東いきもの図鑑</h2>
+      <div class="tabs">
+        <button data-kind="虫">🐛 虫</button>
+        <button data-kind="花">🌸 花</button>
+      </div>
+      <div class="progress"><div id="progressBar"></div></div>
+      <div id="progressText" class="muted"></div>
+      <div id="zukan"></div>
+    </section>
+
+    <!-- 新発見 -->
+    <section>
+      <h2>✨ 新発見 <span id="newCount" class="muted"></span></h2>
+      <p class="muted">図鑑のリストにない生き物はここに入ります。なかまを決めると図鑑に追加できます。</p>
+      <div id="newList" class="grid"></div>
+    </section>
+  </div>
+</main>
+
+<!-- 詳細 -->
+<dialog id="detail">
+  <div id="detailContent"></div>
+</dialog>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js';
+import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, writeBatch } from 'https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js';
+
+// Firebase の設定（公開してよい情報。家族以外の読み書きは Firestore のルールで防ぐ）
+const firebaseConfig = {
+  apiKey: 'AIzaSyCXEi5qoppA7d7iYvxUFSwDU1khwmnPHkw',
+  authDomain: 'ikimono-zukan-56897.firebaseapp.com',
+  projectId: 'ikimono-zukan-56897',
+  storageBucket: 'ikimono-zukan-56897.firebasestorage.app',
+  messagingSenderId: '838722467232',
+  appId: '1:838722467232:web:2e5dff338fa1eaafff60c5',
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
+const DEFAULT_MODEL = 'gemini-flash-latest';
+const FALLBACK_MODEL = 'gemini-flash-lite-latest';
+const REQUEST_TIMEOUT_MS = 30000;
+const $ = (id) => document.getElementById(id);
+
+// ---------- 図鑑リスト（関東の身近な100種） ----------
+// 虫はなかま、花は季節で分ける。⚠ は刺す・かむことがあるもの
+const SPECIES_DATA = {
+  '虫': {
+    'チョウ・ガ': [
+      ['モンシロチョウ', '春のキャベツ畑や花だんの定番。白いはねに黒い点'],
+      ['モンキチョウ', '黄色っぽいはね。原っぱを低く飛ぶ'],
+      ['キタキチョウ', 'あざやかな黄色。モンキチョウとの見分けに挑戦'],
+      ['ナミアゲハ', '黄色と黒のしま模様。ミカンの木に卵を産む'],
+      ['キアゲハ', 'ナミアゲハのそっくりさん。はねのつけ根が黒い'],
+      ['クロアゲハ', '黒くて大きなアゲハ'],
+      ['アオスジアゲハ', '青緑のすじが光る。街なかの公園でも見られる'],
+      ['ツマグロヒョウモン', 'オレンジに黒いもよう。パンジーの花だんに来る'],
+      ['ヤマトシジミ', '道ばたの小さな水色のチョウ'],
+      ['ベニシジミ', 'オレンジ色の小さなチョウ。春に多い'],
+      ['イチモンジセセリ', '茶色でずんぐり。秋に花に集まる'],
+      ['オオスカシバ', 'ハチドリのように空中で止まって蜜を吸うガ'],
+    ],
+    'トンボ': [
+      ['シオカラトンボ', '水色の体。池や公園の定番'],
+      ['オオシオカラトンボ', 'シオカラより青が濃い。日かげの水辺に多い'],
+      ['アキアカネ', '秋の赤とんぼ。夏は山にいて秋に下りてくる'],
+      ['ウスバキトンボ', '夏に群れで飛ぶオレンジ色のトンボ'],
+      ['ギンヤンマ', '大きくて速い。つかまえられたら自慢できる'],
+      ['コシアキトンボ', '黒い体に白い帯。池の上をパトロールする'],
+      ['ハグロトンボ', '黒いはねでひらひら飛ぶ。小川の近く'],
+    ],
+    'セミ': [
+      ['アブラゼミ', '「ジージー」。茶色いはねのセミ'],
+      ['ミンミンゼミ', '「ミーンミンミン」。緑と黒の体'],
+      ['ツクツクボウシ', '「ツクツクオーシ」。夏の終わりに鳴く'],
+      ['ニイニイゼミ', '小さくて木の皮そっくり。一番早く鳴き始める'],
+      ['ヒグラシ', '「カナカナ」。夕方や朝、林の近くで鳴く'],
+      ['クマゼミ', '「シャンシャン」。もとは西日本のセミ。関東では見つけたらラッキー'],
+    ],
+    'バッタ・コオロギ': [
+      ['ショウリョウバッタ', '顔がとがった細長いバッタ。オスはキチキチと鳴いて飛ぶ'],
+      ['オンブバッタ', '小さなオスが大きなメスの背中に乗っている'],
+      ['トノサマバッタ', '大きくて力強いジャンプ。広い原っぱにいる'],
+      ['コバネイナゴ', '田んぼや川原の草むらに多い'],
+      ['エンマコオロギ', '秋の夜「コロコロリー」。黒くて大きい'],
+      ['アオマツムシ', '街路樹の上で「リーリー」と大きな声で鳴く緑の虫'],
+    ],
+    'カマキリ': [
+      ['オオカマキリ', '大きなカマキリ。秋に草むらで見つかる'],
+      ['ハラビロカマキリ', 'おなかが太め。木の上にいることが多い'],
+      ['コカマキリ', '小さめで茶色。地面の近くにいる'],
+    ],
+    'カブトムシ・クワガタ・コガネムシ': [
+      ['カブトムシ', '夏の夜、雑木林の樹液や街灯に来る。見つけたら大当たり'],
+      ['ノコギリクワガタ', '大あごがノコギリのよう。夏の雑木林'],
+      ['コクワガタ', '小さめのクワガタ。関東では一番見つけやすい'],
+      ['カナブン', '樹液に集まる緑〜茶色の甲虫。カブトムシの親戚'],
+      ['アオドウガネ', '緑色のコガネムシのなかま。夏の夜、明かりに来る'],
+      ['マメコガネ', '小さくて緑と茶色。葉っぱの上に多い'],
+    ],
+    'そのほかの甲虫': [
+      ['ナナホシテントウ', '赤に黒い点が7つ。春の野原の人気者'],
+      ['ナミテントウ', 'もようが1匹ずつちがう。いくつ見つかるかな'],
+      ['ニジュウヤホシテントウ', '点がたくさん。ナスやジャガイモの葉を食べる'],
+      ['ゴマダラカミキリ', '黒に白い点。長い触角'],
+      ['タマムシ', '虹色に光る美しい虫。見つけたら大ニュース'],
+    ],
+    'ハチ・アリ': [
+      ['セイヨウミツバチ', '⚠ 花から花へ蜜を集める'],
+      ['キムネクマバチ', '⚠ 黒くて丸い大きなハチ。おとなしいが、さわらないで'],
+      ['セグロアシナガバチ', '⚠ 足を垂らして飛ぶ。巣に近づかないこと'],
+      ['クロオオアリ', '日本で一番大きなアリのなかま'],
+      ['クロヤマアリ', '公園や道ばたでよく見る黒いアリ'],
+    ],
+    'カメムシ・アメンボ': [
+      ['ナミアメンボ', '水の上をすいすい歩く'],
+      ['クサギカメムシ', '茶色いカメムシ。さわるとくさいにおい'],
+      ['ヨコヅナサシガメ', '⚠ 桜の木の幹に集まる黒と白の虫。さすので注意'],
+    ],
+    'クモ': [
+      ['ジョロウグモ', '秋に大きな金色の巣を張る。黄色と黒のもよう'],
+      ['ナガコガネグモ', '巣にジグザグの白い帯をつける'],
+      ['アダンソンハエトリ', '家の中をぴょんぴょん跳ねる小さなクモ'],
+      ['アシダカグモ', '家に出る大きなクモ。ゴキブリを食べてくれる'],
+    ],
+    'ダンゴムシ・カタツムリなど': [
+      ['オカダンゴムシ', 'さわると丸くなる。実はエビやカニの親戚'],
+      ['ワラジムシ', 'ダンゴムシに似ているけど丸くならない'],
+      ['ミスジマイマイ', '関東でよく見るカタツムリ。雨の日に出てくる'],
+    ],
+  },
+  '花': {
+    '春': [
+      ['ソメイヨシノ', 'お花見のサクラ'],
+      ['セイヨウタンポポ', '外国から来たタンポポ。花の下の緑の部分が反り返る'],
+      ['カントウタンポポ', '関東にもとからいるタンポポ。セイヨウタンポポと見比べよう'],
+      ['オオイヌノフグリ', '早春の道ばたの小さな青い花'],
+      ['ホトケノザ', 'ピンクの花。葉が仏さまの座布団に見える'],
+      ['ナズナ', 'ペンペングサ。実が三味線のばちの形'],
+      ['ハルジオン', 'つぼみが下を向く。ヒメジョオンとそっくり'],
+      ['シロツメクサ', 'クローバー。四つ葉を探そう'],
+      ['カラスノエンドウ', '小さなエンドウ豆のような実ができる'],
+      ['タチツボスミレ', 'うすむらさきのスミレ。林のふちに多い'],
+      ['ツツジ', '公園や道ぞいの植えこみ'],
+      ['チューリップ', '花だんの定番'],
+    ],
+    '夏': [
+      ['アジサイ', '梅雨の花。土によって色が変わる'],
+      ['ドクダミ', '白い十字の花。独特のにおい'],
+      ['ツユクサ', '青い2枚の花びら。朝に咲いて昼にしぼむ'],
+      ['ヒメジョオン', '白い小さな花。ハルジオンより遅く咲く'],
+      ['ネジバナ', 'ピンクの花がらせん状に並ぶ。芝生で探そう'],
+      ['ヒルガオ', '昼に咲くアサガオの親戚'],
+      ['オシロイバナ', '夕方に咲く。黒い種の中に白い粉'],
+      ['ヘクソカズラ', 'かわいい花なのにひどい名前'],
+      ['ヒマワリ', '夏の代表'],
+      ['アサガオ', '夏休みの観察の定番'],
+      ['サルスベリ', '夏に長く咲くピンクの花。幹がつるつる'],
+      ['ノウゼンカズラ', 'オレンジのラッパ形の花。塀や壁をはい上がる'],
+    ],
+    '秋': [
+      ['ヒガンバナ', 'お彼岸のころ、田んぼのあぜに真っ赤に咲く'],
+      ['キンモクセイ', '小さなオレンジの花。においで秋を知らせる'],
+      ['コスモス', '秋桜。風にゆれるピンクの花'],
+      ['セイタカアワダチソウ', '背の高い黄色い花。空き地を黄色にそめる'],
+      ['ススキ', 'お月見のかざり。秋の野原の主役'],
+      ['イヌタデ', '赤いつぶつぶの花。「アカマンマ」とも呼ばれる'],
+      ['ノコンギク', 'うすむらさきの野菊'],
+      ['クズ', '秋の七草。つるで何でもおおってしまう'],
+      ['ハギ', '秋の七草。小さな赤むらさきの花'],
+      ['ミゾソバ', '水辺に咲く金平糖のような花'],
+    ],
+    '冬': [
+      ['サザンカ', '冬の生け垣。花びらが1枚ずつ散る'],
+      ['ヤブツバキ', '赤い花。花ごとポトリと落ちる。サザンカと見比べよう'],
+      ['ニホンズイセン', '寒い時期に咲く白と黄色の花（毒があるので食べないで）'],
+      ['ロウバイ', 'ろう細工のような黄色い花'],
+      ['ウメ', '春より一足早く咲く。サクラとの見分けに挑戦'],
+      ['パンジー', '冬の花だんの定番'],
+    ],
+  },
+};
+
+// なかまの一覧 [{kind, group}]
+const GROUPS = Object.entries(SPECIES_DATA).flatMap(([kind, groups]) =>
+  Object.keys(groups).map((group) => ({ kind, group })));
+
+const BUILTIN_SPECIES = GROUPS.flatMap(({ kind, group }) =>
+  SPECIES_DATA[kind][group].map(([name, note]) => ({ kind, group, name, note })));
+
+// ---------- 家族で共有するデータ（Firestore） ----------
+// entries:       見つけた記録（小さい写真つき）
+// photos/{id}:   記録ごとの大きい写真（詳細を開いたときだけ読む）
+// customSpecies: 新発見から図鑑に追加した種（No.101 以降）
+// config/app:    Gemini の API キー
+let entries = [];
+let customSpecies = [];
+let geminiKey = '';
+let unsubscribers = [];
+
+function allSpecies() {
+  return [...BUILTIN_SPECIES, ...customSpecies].map((s, i) => ({ ...s, no: i + 1 }));
+}
+const findSpecies = (name) => allSpecies().find((s) => s.name === name);
+const kindOfGroup = (group) => GROUPS.find((g) => g.group === group)?.kind;
+const pad = (no) => String(no).padStart(3, '0');
+
+// ---------- この端末だけの設定 ----------
+function getLocal(key, fallback = '') {
+  try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+}
+function setLocal(key, value) {
+  try { localStorage.setItem(key, value); } catch {}
+}
+
+// ---------- ログイン ----------
+function showView(name) {
+  $('loadingView').classList.toggle('hidden', name !== 'loading');
+  $('loginView').classList.toggle('hidden', name !== 'login');
+  $('appView').classList.toggle('hidden', name !== 'app');
+  $('headerActions').classList.toggle('hidden', name !== 'app');
+}
+
+$('loginBtn').onclick = async () => {
+  $('loginError').textContent = '';
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (err) {
+    if (err.code !== 'auth/popup-closed-by-user') $('loginError').textContent = `ログインできませんでした（${err.code || err.message}）`;
+  }
+};
+$('logoutBtn').onclick = () => signOut(auth);
+
+// 家族として登録されていないアカウントは、ルールで読み取りを断られる
+function onDenied(err) {
+  console.error(err);
+  signOut(auth);
+  $('loginError').textContent = err.code === 'permission-denied'
+    ? 'このアカウントは家族として登録されていません。管理している人に、Firebase のルールにメールアドレスを追加してもらってください。'
+    : `データを読み込めませんでした（${err.code || err.message}）`;
+}
+
+onAuthStateChanged(auth, (user) => {
+  unsubscribers.forEach((u) => u());
+  unsubscribers = [];
+  if (!user) { showView('login'); return; }
+  showView('loading');
+  $('finder').value = getLocal('finder', user.displayName || '');
+
+  let loaded = 0;
+  const ready = () => { if (++loaded === 3) { showView('app'); render(); } else if (loaded > 3) render(); };
+  unsubscribers.push(
+    onSnapshot(collection(db, 'entries'), (snap) => {
+      entries = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      ready();
+    }, onDenied),
+    onSnapshot(collection(db, 'customSpecies'), (snap) => {
+      customSpecies = snap.docs.map((d) => d.data()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      ready();
+    }, onDenied),
+    onSnapshot(doc(db, 'config', 'app'), (snap) => {
+      geminiKey = snap.data()?.geminiKey || '';
+      if (!geminiKey) $('settings').classList.remove('hidden');
+      ready();
+    }, onDenied),
+  );
+});
+
+// ---------- 設定 ----------
+$('settingsBtn').onclick = () => {
+  $('apiKey').value = geminiKey;
+  $('model').value = getLocal('model', DEFAULT_MODEL);
+  $('settings').classList.toggle('hidden');
+};
+$('saveSettings').onclick = async () => {
+  await setDoc(doc(db, 'config', 'app'), { geminiKey: $('apiKey').value.trim() }, { merge: true });
+  setLocal('model', $('model').value.trim() || DEFAULT_MODEL);
+  $('settings').classList.add('hidden');
+};
+
+// ---------- 写真の読み込み ----------
+// 用途ごとに大きさを変える：AIに送る用・保存する大きい写真・一覧用の小さい写真
+let photos = null;
+let photoMonth = null;
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(img.src); resolve(img); };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+function resized(img, maxSize, quality) {
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+$('photo').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  let img;
+  try {
+    img = await loadImage(file);
+  } catch {
+    $('error').textContent = 'この写真はブラウザで読み込めませんでした。JPG か PNG の写真を選んでください。\n（iPhone の HEIC 形式の写真は、パソコンのブラウザでは開けないことがあります）';
+    return;
+  }
+  photos = {
+    ai: resized(img, 1024, 0.85),
+    large: resized(img, 800, 0.7),
+    thumb: resized(img, 240, 0.7),
+  };
+  // 撮ったその場ならファイルの日時＝撮影日時。季節のヒントとしてAIに渡す
+  photoMonth = new Date(file.lastModified || Date.now()).getMonth() + 1;
+  $('preview').src = photos.ai;
+  $('preview').classList.remove('hidden');
+  $('identifyBtn').classList.remove('hidden');
+  $('result').classList.add('hidden');
+  $('error').textContent = '';
+};
+
+// ---------- 画像認識（Gemini API） ----------
+const buildPrompt = (month) => `あなたは日本の動植物にくわしい図鑑の編集者です。
+写真に写っている植物（花）または虫（クモやダンゴムシ、カタツムリなども含む）を特定してください。
+この写真は日本で${month}月に撮影されました。その季節に見られる種を優先して考えてください。
+似ている種がある場合は、可能性の高い順に最大3つの候補を挙げてください。
+
+次の図鑑リストにある種の場合は、name をリストの表記とまったく同じにしてください。
+${allSpecies().map((s) => s.name).join('、')}
+
+group には、次のなかまからいちばん近いものを1つ選んでください（花は咲く季節を選ぶ）。
+${GROUPS.map((g) => g.group).join('、')}
+
+次のJSON形式だけで答えてください。
+{
+  "candidates": [
+    {
+      "name": "和名",
+      "scientificName": "学名",
+      "group": "なかま",
+      "confidence": 0から100の整数（この候補である確からしさ）,
+      "description": "図鑑の説明文（特徴・見られる場所や季節など、100〜150字）"
+    }
+  ]
+}
+植物や虫が写っていない場合は {"candidates": []} を返してください。`;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Google 側が混んでいるとき（500/503）は、待ってやり直し → 軽いモデルに切り替える
+async function identify(dataUrl, month, onStatus = () => {}) {
+  if (!geminiKey) throw new Error('先に「⚙ 設定」で API キーを保存してください。');
+  const mainModel = getLocal('model', DEFAULT_MODEL);
+  const models = [mainModel, FALLBACK_MODEL].filter((m, i, arr) => arr.indexOf(m) === i);
+  const [meta, base64] = dataUrl.split(',');
+  const mimeType = meta.match(/data:(.*);base64/)[1];
+
+  let lastMsg = '';
+  for (const model of models) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (model !== mainModel) onStatus('混んでいるので軽いモデルで調べています…');
+      else if (attempt > 1) onStatus(`混んでいるのでやり直しています…（${attempt}回目）`);
+
+      let res, json;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+          body: JSON.stringify({
+            contents: [{ parts: [{ inline_data: { mime_type: mimeType, data: base64 } }, { text: buildPrompt(month) }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+        json = await res.json();
+      } catch (err) {
+        // 返事が来ないときは、同じモデルで待ち直さず次のモデルへ進む
+        if (err.name !== 'TimeoutError') throw err;
+        lastMsg = `${REQUEST_TIMEOUT_MS / 1000}秒待っても返事がありませんでした。`;
+        break;
+      }
+      if (res.ok) {
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        return JSON.parse(text).candidates || [];
+      }
+      lastMsg = json.error?.message || res.statusText;
+      if (res.status === 429) throw new Error('無料枠の回数制限に達しました。少し時間をおいてから試してください。\n' + lastMsg);
+      if (res.status !== 500 && res.status !== 503) throw new Error(`画像認識でエラーが起きました（${res.status}）\n${lastMsg}`);
+      if (attempt < 3) await sleep(attempt * 2000);
+    }
+  }
+  throw new Error('Google 側がとても混み合っています。数分おいてからもう一度試してください。\n' + lastMsg);
+}
+
+// ---------- 判定結果の表示 ----------
+let candidates = [];
+let selectedIndex = -1;
+
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const searchLink = (name) => `<a class="search-link" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(name)}" target="_blank" rel="noopener">🔎 画像検索で確かめる</a>`;
+
+function statusBadge(name, aiGroup) {
+  const s = findSpecies(name);
+  if (s) return `<span class="badge">📖 No.${pad(s.no)} ${escapeHtml(s.group)}</span>`;
+  return `<span class="badge new">✨ 新発見${aiGroup ? `（${escapeHtml(aiGroup)}のなかま？）` : ''}</span>`;
+}
+
+function infoHtml(c) {
+  return `
+    <div class="name">${escapeHtml(c.name)}</div>
+    <div class="sci">${escapeHtml(c.scientificName)}</div>
+    <div>
+      ${statusBadge(c.name, c.group)}
+      ${c.confidence != null ? `<span class="badge">確からしさ ${escapeHtml(c.confidence)}%</span>` : ''}
+    </div>
+    <p>${escapeHtml(c.description)}</p>
+    ${searchLink(c.name)}`;
+}
+
+function renderCandidates() {
+  $('candidates').innerHTML = candidates.map((c, i) => `
+    <div class="candidate ${i === selectedIndex ? 'selected' : ''}" data-i="${i}">${infoHtml(c)}</div>`).join('');
+  $('candidates').querySelectorAll('.candidate').forEach((el) => {
+    el.onclick = () => { selectedIndex = Number(el.dataset.i); renderCandidates(); };
+  });
+  $('registerBtn').disabled = selectedIndex < 0;
+}
+
+$('identifyBtn').onclick = async () => {
+  const btn = $('identifyBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>調べています…';
+  $('error').textContent = '';
+  try {
+    candidates = await identify(photos.ai, photoMonth, (msg) => { btn.innerHTML = `<span class="spinner"></span>${msg}`; });
+    if (candidates.length === 0) {
+      $('error').textContent = '植物や虫を見つけられませんでした。もう少し近づいて撮ってみてください。';
+      return;
+    }
+    selectedIndex = 0;
+    renderCandidates();
+    $('result').classList.remove('hidden');
+    $('result').scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    $('error').textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'この写真を調べる';
+  }
+};
+
+$('registerBtn').onclick = async () => {
+  const btn = $('registerBtn');
+  const finder = $('finder').value.trim();
+  setLocal('finder', finder);
+  const c = candidates[selectedIndex];
+  btn.disabled = true;
+  $('registerError').textContent = '';
+  try {
+    const ref = doc(collection(db, 'entries'));
+    const batch = writeBatch(db);
+    batch.set(ref, {
+      name: c.name ?? '',
+      scientificName: c.scientificName ?? '',
+      group: c.group ?? '',
+      confidence: c.confidence ?? null,
+      description: c.description ?? '',
+      finder,
+      finderUid: auth.currentUser.uid,
+      thumb: photos.thumb,
+      date: new Date().toISOString(),
+    });
+    batch.set(doc(db, 'photos', ref.id), { photo: photos.large });
+    await batch.commit();
+  } catch (err) {
+    $('registerError').textContent = `登録できませんでした（${err.code || err.message}）`;
+    btn.disabled = false;
+    return;
+  }
+  $('result').classList.add('hidden');
+  $('preview').classList.add('hidden');
+  $('identifyBtn').classList.add('hidden');
+  $('photo').value = '';
+  // 図鑑のどこに入ったかをそのまま見せる
+  const s = findSpecies(c.name);
+  if (s) { currentKind = s.kind; renderZukan(); openSpecies(s.no); }
+  else openNew(c.name);
+};
+
+// ---------- 図鑑と新発見の表示 ----------
+let currentKind = '虫';
+let reopenDetail = null;
+
+// 名前ごとの記録（新しい順）
+function recordsOf(name) {
+  return entries.filter((e) => e.name === name).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function speciesCard(s) {
+  const recs = recordsOf(s.name);
+  if (recs.length === 0) {
+    return `<div class="card unfound" data-no="${s.no}">
+      <div class="shadow">？</div>
+      <div class="body"><div class="num">No.${pad(s.no)}</div><div class="title">？？？</div></div>
+    </div>`;
+  }
+  return `<div class="card" data-no="${s.no}">
+    <img src="${recs[0].thumb}" alt="">
+    <div class="body"><div class="num">No.${pad(s.no)}</div><div class="title">${escapeHtml(s.name)}</div></div>
+  </div>`;
+}
+
+function renderZukan() {
+  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.kind === currentKind));
+  const list = allSpecies().filter((s) => s.kind === currentKind);
+  const found = list.filter((s) => recordsOf(s.name).length > 0).length;
+  $('progressBar').style.width = `${list.length ? (found / list.length) * 100 : 0}%`;
+  $('progressText').textContent = `${currentKind} ${found} / ${list.length} 種 発見`;
+
+  $('zukan').innerHTML = GROUPS.filter((g) => g.kind === currentKind).map(({ group }) => {
+    const members = list.filter((s) => s.group === group);
+    const groupFound = members.filter((s) => recordsOf(s.name).length > 0).length;
+    return `<h3>${escapeHtml(group)} <span class="muted">${groupFound} / ${members.length}</span></h3>
+      <div class="grid">${members.map(speciesCard).join('')}</div>`;
+  }).join('');
+  $('zukan').querySelectorAll('.card').forEach((el) => {
+    el.onclick = () => openSpecies(Number(el.dataset.no));
+  });
+}
+
+function renderNew() {
+  const names = [...new Set(entries.filter((e) => !findSpecies(e.name)).map((e) => e.name))];
+  $('newCount').textContent = names.length ? `（${names.length}種）` : '';
+  $('newList').innerHTML = names.length === 0
+    ? '<p class="muted">まだありません。</p>'
+    : names.map((name) => `<div class="card new" data-name="${escapeHtml(name)}">
+        <img src="${recordsOf(name)[0].thumb}" alt="">
+        <div class="body"><div class="num">✨ 新発見</div><div class="title">${escapeHtml(name)}</div></div>
+      </div>`).join('');
+  $('newList').querySelectorAll('.card').forEach((el) => {
+    el.onclick = () => openNew(el.dataset.name);
+  });
+}
+
+// 家族の誰かが登録・削除したときも呼ばれる。開いている詳細も最新にする
+function render() {
+  renderZukan();
+  renderNew();
+  if ($('detail').open && reopenDetail) reopenDetail();
+}
+
+document.querySelectorAll('.tabs button').forEach((b) => {
+  b.onclick = () => { currentKind = b.dataset.kind; renderZukan(); };
+});
+
+// ---------- 詳細 ----------
+const largePhotos = new Map();
+
+// 大きい写真は詳細を開いたときだけ読む（一覧は小さい写真で軽くする）
+async function loadLargePhoto(entry) {
+  if (!largePhotos.has(entry.id)) {
+    const snap = await getDoc(doc(db, 'photos', entry.id));
+    largePhotos.set(entry.id, snap.data()?.photo || entry.thumb);
+  }
+  const hero = $('detailContent').querySelector('.hero');
+  if (hero && hero.dataset.id === entry.id) hero.src = largePhotos.get(entry.id);
+}
+
+function heroHtml(entry) {
+  return `<img class="hero" data-id="${entry.id}" src="${largePhotos.get(entry.id) || entry.thumb}" alt="">`;
+}
+
+function recordsHtml(recs) {
+  return `<h3>見つけた記録 <span class="muted">${recs.length}回</span></h3>
+    <div class="records">${recs.map((r) => `
+      <div class="record">
+        <img src="${r.thumb}" alt="">
+        <div class="info">
+          ${new Date(r.date).toLocaleDateString('ja-JP')}<br>
+          ${r.finder ? `見つけた人: ${escapeHtml(r.finder)}` : ''}
+        </div>
+        <button class="small danger" data-delete="${r.id}">削除</button>
+      </div>`).join('')}
+    </div>`;
+}
+
+// 確認ウィンドウ（confirm）は出ないブラウザがあるので、ボタンを2回押して確定する
+function confirmByTwoTaps(btn, confirmLabel, action) {
+  const originalLabel = btn.textContent;
+  let timer = null;
+  btn.onclick = async () => {
+    if (!timer) {
+      btn.textContent = confirmLabel;
+      timer = setTimeout(() => { btn.textContent = originalLabel; timer = null; }, 4000);
+      return;
+    }
+    clearTimeout(timer);
+    btn.disabled = true;
+    await action();
+  };
+}
+
+function showDetail(html, reopen) {
+  reopenDetail = reopen;
+  $('detailContent').innerHTML = html + `<div class="body" style="padding-top:0"><div class="row"><button id="closeDetail">閉じる</button></div></div>`;
+  $('closeDetail').onclick = () => $('detail').close();
+  $('detailContent').querySelectorAll('[data-delete]').forEach((btn) => {
+    confirmByTwoTaps(btn, '本当に削除？', async () => {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'entries', btn.dataset.delete));
+      batch.delete(doc(db, 'photos', btn.dataset.delete));
+      await batch.commit();
+    });
+  });
+  if (!$('detail').open) $('detail').showModal();
+}
+
+function openSpecies(no) {
+  const s = allSpecies().find((x) => x.no === no);
+  if (!s) { $('detail').close(); return; }
+  const recs = recordsOf(s.name);
+  if (recs.length === 0) {
+    showDetail(`<div class="body">
+      <div class="num muted">No.${pad(s.no)}・${escapeHtml(s.group)}</div>
+      <div class="name">？？？</div>
+      <p>まだ見つけていません。</p>
+      ${s.note ? `<p class="muted">ヒント: ${escapeHtml(s.note)}</p>` : ''}
+    </div>`, () => openSpecies(no));
+    return;
+  }
+  const latest = recs[0];
+  showDetail(`${heroHtml(latest)}
+    <div class="body">
+      <div class="muted">No.${pad(s.no)}・${escapeHtml(s.group)}</div>
+      <div class="name">${escapeHtml(s.name)}</div>
+      <div class="sci">${escapeHtml(latest.scientificName)}</div>
+      ${s.note ? `<p><b>${escapeHtml(s.note)}</b></p>` : ''}
+      <p>${escapeHtml(latest.description)}</p>
+      ${searchLink(s.name)}
+      ${recordsHtml(recs)}
+    </div>`, () => openSpecies(no));
+  loadLargePhoto(latest);
+}
+
+function openNew(name) {
+  const recs = recordsOf(name);
+  // 図鑑に追加された・登録しなおされたときは、新発見の詳細を閉じる
+  if (recs.length === 0 || findSpecies(name)) { $('detail').close(); return; }
+  const latest = recs[0];
+  const groupOptions = GROUPS.map(({ kind, group }) =>
+    `<option value="${escapeHtml(group)}" ${group === latest.group ? 'selected' : ''}>${kind}：${escapeHtml(group)}</option>`).join('');
+  const speciesOptions = allSpecies().map((s) =>
+    `<option value="${escapeHtml(s.name)}">No.${pad(s.no)} ${escapeHtml(s.name)}</option>`).join('');
+
+  showDetail(`${heroHtml(latest)}
+    <div class="body">
+      <span class="badge new">✨ 新発見</span>
+      <div class="name">${escapeHtml(name)}</div>
+      <div class="sci">${escapeHtml(latest.scientificName)}</div>
+      <p>${escapeHtml(latest.description)}</p>
+      ${searchLink(name)}
+      <div class="maint">
+        <b>図鑑に追加する</b>
+        <label for="addGroup">なかま</label>
+        <select id="addGroup">${groupOptions}</select>
+        <div class="row"><button class="primary" id="addToZukan">このなかまで図鑑に追加</button></div>
+        <label for="mergeTo">または、実は図鑑にいる生き物だった場合</label>
+        <select id="mergeTo">${speciesOptions}</select>
+        <div class="row"><button id="mergeBtn">この生き物として登録しなおす</button></div>
+      </div>
+      ${recordsHtml(recs)}
+    </div>`, () => openNew(name));
+  loadLargePhoto(latest);
+
+  $('addToZukan').onclick = async () => {
+    const group = $('addGroup').value;
+    await setDoc(doc(collection(db, 'customSpecies')), {
+      kind: kindOfGroup(group), group, name, note: '', createdAt: new Date().toISOString(),
+    });
+    const s = findSpecies(name);
+    if (s) { currentKind = s.kind; renderZukan(); openSpecies(s.no); }
+  };
+  confirmByTwoTaps($('mergeBtn'), 'もう一度押すと登録しなおします', async () => {
+    const target = $('mergeTo').value;
+    const batch = writeBatch(db);
+    recs.forEach((r) => batch.update(doc(db, 'entries', r.id), { name: target }));
+    await batch.commit();
+    const s = findSpecies(target);
+    if (s) { currentKind = s.kind; renderZukan(); openSpecies(s.no); }
+  });
+}
+</script>
+</body>
+</html>
