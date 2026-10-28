@@ -216,6 +216,8 @@
       <div id="candidates"></div>
       <label for="finder">見つけた人</label>
       <input type="text" id="finder" placeholder="なまえ">
+      <label for="nickname">おなまえ（この子の名前。なくてもOK）</label>
+      <input type="text" id="nickname" placeholder="例：ポチ">
       <div class="row">
         <button class="primary" id="registerBtn" disabled>登録する</button>
       </div>
@@ -228,6 +230,7 @@
       <div class="tabs">
         <button data-kind="虫">🐛 虫</button>
         <button data-kind="花">🌸 花</button>
+        <button data-kind="犬">🐶 犬</button>
       </div>
       <div class="progress"><div id="progressBar"></div></div>
       <div id="progressText" class="muted"></div>
@@ -408,6 +411,42 @@ const SPECIES_DATA = {
       ['パンジー', '冬の花だんの定番'],
     ],
   },
+  '犬': {
+    '小型犬': [
+      ['トイ・プードル', 'くるくるの毛。日本で一番人気の犬種'],
+      ['チワワ', '世界でいちばん小さい犬種。大きな目と耳'],
+      ['ミニチュア・ダックスフンド', '胴長短足。もとはアナグマをつかまえる犬'],
+      ['ポメラニアン', 'ふわふわの毛玉のような犬'],
+      ['ミニチュア・シュナウザー', '立派なまゆげとおひげ'],
+      ['ヨークシャー・テリア', 'さらさらの長い毛。「動く宝石」と呼ばれる'],
+      ['マルチーズ', '真っ白な長い毛'],
+      ['シー・ズー', '顔まわりの毛を頭の上で結んでいることが多い'],
+      ['パピヨン', 'チョウのはねのような大きな耳'],
+      ['ミニチュア・ピンシャー', '小さいけれど元気いっぱい。キリッとした顔'],
+      ['パグ', 'しわしわの顔とくるんと巻いたしっぽ'],
+      ['フレンチ・ブルドッグ', 'コウモリのような立ち耳と、つぶれた鼻'],
+      ['キャバリア・キング・チャールズ・スパニエル', 'たれ耳でやさしい顔。もとはイギリスの王様の犬'],
+      ['ジャック・ラッセル・テリア', '白に茶色のぶち。ジャンプが得意'],
+    ],
+    '中型犬': [
+      ['柴犬', '日本犬の代表。くるんと巻いたしっぽ'],
+      ['ウェルシュ・コーギー・ペンブローク', '短い足と大きなおしり。もとは牛を追う犬'],
+      ['ビーグル', 'たれ耳で鼻がよくきく。白・茶・黒の3色'],
+      ['ボーダー・コリー', 'とてもかしこい牧羊犬。白と黒が多い'],
+      ['シェットランド・シープドッグ', '「シェルティー」。小さなコリーのような姿'],
+      ['日本スピッツ', '真っ白でふわふわ。とがった口元'],
+    ],
+    '大型犬': [
+      ['ゴールデン・レトリーバー', '金色の長い毛。やさしくて人が大好き'],
+      ['ラブラドール・レトリーバー', '盲導犬としても活やく。黒・黄・チョコ色'],
+      ['秋田犬', '大きな日本犬。忠犬ハチ公もこの犬種'],
+      ['シベリアン・ハスキー', 'オオカミのような顔。青い目のことも'],
+      ['バーニーズ・マウンテン・ドッグ', '黒・白・茶の3色の大きな犬。もとはスイスの働く犬'],
+    ],
+    'ミックス': [
+      ['ミックス犬', 'いろいろな犬種がまざった犬。世界に一頭だけの姿'],
+    ],
+  },
 };
 
 // なかまの一覧 [{kind, group}]
@@ -555,14 +594,15 @@ $('photo').onchange = async (e) => {
 
 // ---------- 画像認識（Gemini API） ----------
 const buildPrompt = (month) => `あなたは日本の動植物にくわしい図鑑の編集者です。
-写真に写っている植物（花）または虫（クモやダンゴムシ、カタツムリなども含む）を特定してください。
+写真に写っている植物（花）、虫（クモやダンゴムシ、カタツムリなども含む）、または犬を特定してください。
+犬の場合は犬種を答えてください。いろいろな犬種がまざっていそうなら、name を「ミックス犬」、group を「ミックス」にしてください。
 この写真は日本で${month}月に撮影されました。その季節に見られる種を優先して考えてください。
 似ている種がある場合は、可能性の高い順に最大3つの候補を挙げてください。
 
 次の図鑑リストにある種の場合は、name をリストの表記とまったく同じにしてください。
 ${allSpecies().map((s) => s.name).join('、')}
 
-group には、次のなかまからいちばん近いものを1つ選んでください（花は咲く季節を選ぶ）。
+group には、次のなかまからいちばん近いものを1つ選んでください（花は咲く季節、犬は大きさを選ぶ）。
 ${GROUPS.map((g) => g.group).join('、')}
 
 次のJSON形式だけで答えてください。
@@ -577,7 +617,7 @@ ${GROUPS.map((g) => g.group).join('、')}
     }
   ]
 }
-植物や虫が写っていない場合は {"candidates": []} を返してください。`;
+植物や虫や犬が写っていない場合は {"candidates": []} を返してください。`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -700,6 +740,7 @@ $('registerBtn').onclick = async () => {
       confidence: c.confidence ?? null,
       description: c.description ?? '',
       finder,
+      nickname: $('nickname').value.trim(),
       finderUid: auth.currentUser.uid,
       thumb: photos.thumb,
       date: new Date().toISOString(),
@@ -715,6 +756,7 @@ $('registerBtn').onclick = async () => {
   $('preview').classList.add('hidden');
   $('identifyBtn').classList.add('hidden');
   $('photo').value = '';
+  $('nickname').value = '';
   // 図鑑のどこに入ったかをそのまま見せる
   const s = findSpecies(c.name);
   if (s) { currentKind = s.kind; renderZukan(); openSpecies(s.no); }
@@ -810,6 +852,7 @@ function recordsHtml(recs) {
       <div class="record">
         <img src="${r.thumb}" alt="">
         <div class="info">
+          ${r.nickname ? `<b>おなまえ: ${escapeHtml(r.nickname)}</b><br>` : ''}
           ${new Date(r.date).toLocaleDateString('ja-JP')}<br>
           ${r.finder ? `見つけた人: ${escapeHtml(r.finder)}` : ''}
         </div>
