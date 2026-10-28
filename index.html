@@ -695,7 +695,10 @@ async function identify(dataUrl, month, onStatus = () => {}) {
         json = await res.json();
       } catch (err) {
         // 返事が来ないときは、同じモデルで待ち直さず次のモデルへ進む
-        if (err.name !== 'TimeoutError') throw err;
+        // （iPhone の Safari は待ち時間切れを TimeoutError ではなく AbortError で知らせることがある）
+        if (err.name !== 'TimeoutError' && err.name !== 'AbortError') {
+          throw new Error('通信がうまくいきませんでした。電波のよいところで、もう一度試してください。\n' + err.message);
+        }
         lastMsg = `${REQUEST_TIMEOUT_MS / 1000}秒待っても返事がありませんでした。`;
         break;
       }
