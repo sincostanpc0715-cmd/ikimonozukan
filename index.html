@@ -89,6 +89,8 @@
     color: var(--accent);
     cursor: pointer;
   }
+  .shoot-row { display: flex; gap: 8px; }
+  .shoot-row .shoot-btn { flex: 1; padding: 22px 8px; font-size: 1rem; }
   #preview { width: 100%; max-height: 360px; object-fit: contain; border-radius: 8px; margin-top: 12px; background: #000; }
 
   .candidate {
@@ -200,8 +202,13 @@
     <!-- 撮影 -->
     <section>
       <h2>📷 見つけたいきものを調べる</h2>
-      <label class="shoot-btn" for="photo">写真を撮る / 選ぶ</label>
-      <input type="file" id="photo" accept="image/*" capture="environment" class="hidden">
+      <div class="shoot-row">
+        <label class="shoot-btn" for="camera">📷 写真を撮る</label>
+        <label class="shoot-btn" for="album">🖼 アルバムから選ぶ</label>
+      </div>
+      <!-- capture があるとスマホではカメラが直接起動するので、アルバム用は capture なし -->
+      <input type="file" id="camera" accept="image/*" capture="environment" class="hidden">
+      <input type="file" id="album" accept="image/*" class="hidden">
       <img id="preview" class="hidden" alt="">
       <div class="row">
         <button class="primary hidden" id="identifyBtn">この写真を調べる</button>
@@ -550,6 +557,42 @@ $('saveSettings').onclick = async () => {
 // 用途ごとに大きさを変える：AIに送る用・保存する大きい写真・一覧用の小さい写真
 let photos = null;
 let photoMonth = null;
+let photoDate = null;
+
+// 写真（JPG）に記録されている撮影日時を読む。アルバムの古い写真でも撮った日が分かる
+async function readShotDate(file) {
+  try {
+    const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    let p = 2;
+    while (p + 10 < v.byteLength) {
+      const marker = v.getUint16(p);
+      if ((marker & 0xFF00) !== 0xFF00) return null;
+      // APP1 の "Exif" ブロックに撮影日時が入っている
+      if (marker === 0xFFE1 && v.getUint32(p + 4) === 0x45786966) return parseExifDate(v, p + 10);
+      p += 2 + v.getUint16(p + 2);
+    }
+  } catch {}
+  return null;
+}
+function parseExifDate(v, tiff) {
+  const le = v.getUint16(tiff) === 0x4949;
+  const u16 = (o) => v.getUint16(tiff + o, le);
+  const u32 = (o) => v.getUint32(tiff + o, le);
+  const findTag = (ifd, tag) => {
+    for (let i = 0; i < u16(ifd); i++) if (u16(ifd + 2 + i * 12) === tag) return ifd + 2 + i * 12;
+    return null;
+  };
+  const ifd0 = u32(4);
+  const exifIfd = findTag(ifd0, 0x8769);
+  // 0x9003 = 撮影日時、0x0132 = 更新日時（撮影日時がないときの代わり）
+  const entry = (exifIfd && findTag(u32(exifIfd + 8), 0x9003)) || findTag(ifd0, 0x0132);
+  if (!entry) return null;
+  let s = '';
+  for (let i = 0; i < 19; i++) s += String.fromCharCode(v.getUint8(tiff + u32(entry + 8) + i));
+  const m = s.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+  return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+}
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {
@@ -568,7 +611,7 @@ function resized(img, maxSize, quality) {
   return canvas.toDataURL('image/jpeg', quality);
 }
 
-$('photo').onchange = async (e) => {
+async function onPhotoSelected(e) {
   const file = e.target.files[0];
   if (!file) return;
   let img;
@@ -583,14 +626,17 @@ $('photo').onchange = async (e) => {
     large: resized(img, 800, 0.7),
     thumb: resized(img, 240, 0.7),
   };
-  // 撮ったその場ならファイルの日時＝撮影日時。季節のヒントとしてAIに渡す
-  photoMonth = new Date(file.lastModified || Date.now()).getMonth() + 1;
+  // 撮影日時が読めなければ、ファイルの日時（撮ったその場ならほぼ撮影日時）を使う。季節のヒントとしてAIに渡す
+  photoDate = await readShotDate(file);
+  photoMonth = (photoDate || new Date(file.lastModified || Date.now())).getMonth() + 1;
   $('preview').src = photos.ai;
   $('preview').classList.remove('hidden');
   $('identifyBtn').classList.remove('hidden');
   $('result').classList.add('hidden');
   $('error').textContent = '';
-};
+}
+$('camera').onchange = onPhotoSelected;
+$('album').onchange = onPhotoSelected;
 
 // ---------- 画像認識（Gemini API） ----------
 const buildPrompt = (month) => `あなたは日本の動植物にくわしい図鑑の編集者です。
@@ -743,7 +789,8 @@ $('registerBtn').onclick = async () => {
       nickname: $('nickname').value.trim(),
       finderUid: auth.currentUser.uid,
       thumb: photos.thumb,
-      date: new Date().toISOString(),
+      // 見つけた日＝写真の撮影日（読めなければ登録した日）
+      date: (photoDate || new Date()).toISOString(),
     });
     batch.set(doc(db, 'photos', ref.id), { photo: photos.large });
     await batch.commit();
@@ -755,7 +802,8 @@ $('registerBtn').onclick = async () => {
   $('result').classList.add('hidden');
   $('preview').classList.add('hidden');
   $('identifyBtn').classList.add('hidden');
-  $('photo').value = '';
+  $('camera').value = '';
+  $('album').value = '';
   $('nickname').value = '';
   // 図鑑のどこに入ったかをそのまま見せる
   const s = findSpecies(c.name);
