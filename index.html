@@ -668,6 +668,7 @@ ${GROUPS.map((g) => g.group).join('、')}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Google 側が混んでいるとき（500/503）は、待ってやり直し → 軽いモデルに切り替える
+// 無料枠の回数切れ（429）のときも軽いモデルへ。回数はモデルごとに別で、軽いモデルのほうがずっと多い
 async function identify(dataUrl, month, onStatus = () => {}) {
   if (!geminiKey) throw new Error('先に「⚙ 設定」で API キーを保存してください。');
   const mainModel = getLocal('model', DEFAULT_MODEL);
@@ -676,9 +677,11 @@ async function identify(dataUrl, month, onStatus = () => {}) {
   const mimeType = meta.match(/data:(.*);base64/)[1];
 
   let lastMsg = '';
+  let quotaHit = false;
   for (const model of models) {
+    quotaHit = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      if (model !== mainModel) onStatus('混んでいるので軽いモデルで調べています…');
+      if (model !== mainModel) onStatus(lastMsg.startsWith('429') ? '今日のふつうの回数を使い切ったので、軽いモデルで調べています…' : '混んでいるので軽いモデルで調べています…');
       else if (attempt > 1) onStatus(`混んでいるのでやり直しています…（${attempt}回目）`);
 
       let res, json;
@@ -706,11 +709,14 @@ async function identify(dataUrl, month, onStatus = () => {}) {
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
         return JSON.parse(text).candidates || [];
       }
-      lastMsg = json.error?.message || res.statusText;
-      if (res.status === 429) throw new Error('無料枠の回数制限に達しました。少し時間をおいてから試してください。\n' + lastMsg);
-      if (res.status !== 500 && res.status !== 503) throw new Error(`画像認識でエラーが起きました（${res.status}）\n${lastMsg}`);
+      lastMsg = `${res.status} ${json.error?.message || res.statusText}`;
+      if (res.status === 429) { quotaHit = true; break; }
+      if (res.status !== 500 && res.status !== 503) throw new Error(`画像認識でエラーが起きました\n${lastMsg}`);
       if (attempt < 3) await sleep(attempt * 2000);
     }
+  }
+  if (quotaHit) {
+    throw new Error('今日の無料の回数を使い切りました。毎日夕方4〜5時ごろ（アメリカの夜0時）に回数が元に戻ります。\n' + lastMsg);
   }
   throw new Error('Google 側がとても混み合っています。数分おいてからもう一度試してください。\n' + lastMsg);
 }
